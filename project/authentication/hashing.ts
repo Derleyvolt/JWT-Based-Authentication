@@ -9,13 +9,25 @@ export const genRandomNumber = (min: number, max: number) => {
     return min + rand % (max-min+1);
 }
 
+const hexFormat = (numbers: number[]) => {
+    const hex = [];
+
+    for(var e of numbers) {
+        const lsNibble = 0xF   & e;
+        const msNibble = (0xF0 & e) >> 4;
+        hex.push(msNibble.toString(16) + lsNibble.toString(16));
+    }
+
+    return hex.join('');
+}
+
 export const genSalt = (length: number) => {
     const out = [];
     for(let i = 0; i < length; i++) {
-        out.push(genRandomNumber(33, 125));
+        out.push(genRandomNumber(0, 255));
     }
 
-    return String.fromCharCode(...out);
+    return hexFormat(out);
 }
 
 export const sha256 = (data: string) => {
