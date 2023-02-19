@@ -1,10 +1,25 @@
 import prisma                               from '../../util/prismaClient';
 import { NextFunction, Request, Response }  from 'express';
 import { sha256Salted }                     from '../../authentication/hashing';
-import { genSalt }                          from 'bcrypt';
 import { config }                           from 'dotenv';
+import * as auth                            from '../../authentication/based_jwt';
 
 config({ path: '../../../.env' });
+
+enum ExpirationTime {
+    oneDay     = 1000 * 60 * 60 * 24,
+    oneMinute  = 1000 * 60,
+    oneSecond  = 1000,
+}
+
+const passwordIsValid = (hashedPassword: string, supossedPasword: string) => {
+    const lenHex = Number(process.env.SALT_LENGTH) ?? 40;
+    const salt   = hashedPassword.substring(0, lenHex*2);
+    const rounds = Number(process.env.ROUND_HASH) ?? 17;
+    const hash   = sha256Salted(supossedPasword, rounds, salt);
+
+    return hash === hashedPassword;
+}
 
 export const userCheckCredentials = async (req: Request, res: Response, next: NextFunction) => {
     const { username, password, email } = req.body;
@@ -46,14 +61,6 @@ export const listUsers = async (userID: number | undefined) => {
     }
 }
 
-const passwordIsValid = (hashedPassword: string, supossedPasword: string) => {
-    const salt   = hashedPassword.substring(0, 20);
-    const rounds = Number(process.env.ROUND_HASH) ?? 17;
-    const hash   = sha256Salted(supossedPasword, rounds, salt);
-
-    return hash === hashedPassword;
-}
-
 export const loginUser = async (username: string, password: string) => {
     const userExists = await prisma.user.findUnique({
         where: {
@@ -66,7 +73,10 @@ export const loginUser = async (username: string, password: string) => {
 
     if(userExists) {
         if(passwordIsValid(userExists.password, password)) {
-            
+            const expTime   = Date.now() + ExpirationTime.oneMinute * Math.floor(Math.random() * 5 + 1);
+            console.log(expTime);
+            const signature = auth.genSignature({id: username, exp: expTime});
+            return signature;
         } else {
             return false;
         }
